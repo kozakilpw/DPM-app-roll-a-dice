@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#ffe794"/>
+      <stop offset="55%" stop-color="#efc84a"/>
+      <stop offset="100%" stop-color="#c89e2b"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="url(#g)" stroke="#8c6b1b" stroke-width="16"/>
+  <circle cx="256" cy="256" r="206" fill="none" stroke="#b78f28" stroke-width="10" stroke-dasharray="8 10"/>
+  <!-- playful "PISIONT" vibe -->
+  <g font-family="Verdana,Arial,sans-serif" text-anchor="middle">
+    <text x="256" y="150" font-size="46" font-weight="800" fill="#5e4612" letter-spacing=".1em">PISIONT</text>
+    <text x="256" y="200" font-size="28" font-weight="700" fill="#5e4612" letter-spacing=".35em">GROSZY</text>
+  </g>
+  <g transform="translate(0,40)">
+    <circle cx="256" cy="260" r="96" fill="#f6e2a4" stroke="#b78f28" stroke-width="10"/>
+    <text x="256" y="296" text-anchor="middle"
+          font-family="Verdana,Arial,sans-serif" font-size="88" font-weight="900" fill="#745615">50</text>
+  </g>
+  <text x="256" y="480" text-anchor="middle" font-family="Verdana,Arial,sans-serif" font-weight="600" font-size="20" fill="#5e4612">RESZKA</text>
+</svg>

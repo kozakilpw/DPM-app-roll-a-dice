@@ -1,6 +1,6 @@
 # Coin Toss Session Tracker
 
-Next.js 15 (App Router) app for running a classroom coin toss experiment backed by Supabase Realtime.
+Next.js 15 (App Router) app for running a classroom coin toss experiment backed by Supabase Realtime. Supports English/Polish UI with a custom "PISIONT groszy" coin.
 
 ## Local Development
 
@@ -11,21 +11,21 @@ Next.js 15 (App Router) app for running a classroom coin toss experiment backed 
 
 Linting, type checking, and build commands:
 
-- `npm run lint` – ESLint against the whole repo
-- `npm run typecheck` – TypeScript `--noEmit`
-- `npm run build` – production build with Turbopack
-- `npm run build:ci` – lint + typecheck + build (CI parity)
+- `npm run lint`  ESLint against the whole repo
+- `npm run typecheck`  TypeScript `--noEmit`
+- `npm run build`  production build with Turbopack
+- `npm run build:ci`  lint + typecheck + build (CI parity)
 
 ## Supabase Setup Tips
 
 - Realtime is enabled per table; ensure `results` has Realtime enabled in the Supabase dashboard
-- API keys live under **Project Settings ? API**; the public anon key works for this client-only MVP
+- API keys live under **Project Settings â†’ API**; the public anon key works for this client-only MVP
 - The `realtime` channel unsubscribes automatically when components unmount to avoid ghost listeners
 
 ## Deploying on Vercel
 
 1. Create a new Vercel project from this repo (App Router, Node 18+ runtime)
-2. In **Project ? Settings ? Environment Variables**, add:
+2. In **Project -> Settings -> Environment Variables**, add:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 3. Trigger a redeploy; Vercel will run `npm run build:ci`
@@ -40,5 +40,5 @@ Linting, type checking, and build commands:
 
 ## Feature Notes
 
-- `/host` shows a normalized histogram with the expected Binomial(20, 0.5) overlay, CSV export, and real-time updates
-- `/join` blocks duplicate submissions per browser (localStorage) and adds a light flip animation plus a thank-you summary
+- `/host` shows a normalized histogram with the expected Binomial(20, 0.5) overlay, CSV export, real-time updates, and an EN/PL toggle that also adds `?lang=pl` to the QR code link.
+- `/join` blocks duplicate submissions per browser (localStorage), greets first-time visitors with an English/Polish chooser, and uses a flipping coin button rendered from `/public/coin/heads-pl.svg` + `/public/coin/tails-pl.svg`.
