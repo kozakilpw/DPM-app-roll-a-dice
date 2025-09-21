@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { useI18n } from '@/lib/i18n';
 
 type Flip = 'H' | 'T';
 
@@ -15,6 +16,7 @@ const storageKey = (sessionId: string) => `tossed:${sessionId}`;
 export default function JoinClient() {
   const search = useSearchParams();
   const sessionId = search.get('session');
+  const { t, lang, setLang } = useI18n();
 
   const [sessionState, setSessionState] = useState<SessionState>('loading');
   const [sessionMessage, setSessionMessage] = useState<string | null>(null);
@@ -25,13 +27,14 @@ export default function JoinClient() {
   const [wasSubmittedLocally, setWasSubmittedLocally] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isFlipping, setIsFlipping] = useState(false);
+  const [hasLangPreference, setHasLangPreference] = useState(false);
 
   const animationTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
       setSessionState('missing');
-      setSessionMessage('Missing session id in the URL. Use the QR code link from the host.');
+      setSessionMessage(t('missingSessionDescription'));
       return;
     }
 
@@ -51,13 +54,13 @@ export default function JoinClient() {
 
       if (error) {
         setSessionState('missing');
-        setSessionMessage('Could not verify the session. Please try again later.');
+        setSessionMessage(t('couldNotLoadResults'));
         return;
       }
 
       if (!data) {
         setSessionState('missing');
-        setSessionMessage('Session not found.');
+        setSessionMessage(t('missingSessionDescription'));
         return;
       }
 
@@ -76,7 +79,7 @@ export default function JoinClient() {
     return () => {
       ignore = true;
     };
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   useEffect(() => {
     if (!sessionId || typeof window === 'undefined') {
@@ -113,6 +116,14 @@ export default function JoinClient() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const stored = window.localStorage.getItem('lang');
+    setHasLangPreference(stored === 'en' || stored === 'pl');
+  }, [lang]);
+
   const heads = useMemo(() => flips.filter((flip) => flip === 'H').length, [flips]);
   const tails = flips.length - heads;
 
@@ -135,7 +146,7 @@ export default function JoinClient() {
       animationTimer.current = window.setTimeout(() => {
         setIsFlipping(false);
         animationTimer.current = null;
-      }, 300);
+      }, 600);
 
       return [...prev, value];
     });
@@ -150,15 +161,15 @@ export default function JoinClient() {
   const submitResult = useCallback(async () => {
     if (!sessionId || !canInteract) return;
 
-    if (!nickname.trim()) {
-      setFormError('Please enter a nickname.');
-      return;
-    }
+      if (!nickname.trim()) {
+        setFormError(t('nicknameRequired'));
+        return;
+      }
 
-    if (flips.length !== FLIP_TARGET) {
-      setFormError('Please complete exactly 20 flips.');
-      return;
-    }
+      if (flips.length !== FLIP_TARGET) {
+        setFormError(t('flipsRequired'));
+        return;
+      }
 
     setFormError(null);
     setSubmitting(true);
@@ -186,16 +197,16 @@ export default function JoinClient() {
       }
     } catch (error) {
       console.error('Failed to submit result', error);
-      setFormError('Could not submit your result. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  }, [sessionId, canInteract, nickname, flips, heads, tails]);
+        setFormError(t('couldNotSubmit'));
+      } finally {
+        setSubmitting(false);
+      }
+  }, [sessionId, canInteract, nickname, flips, heads, tails, t]);
 
   if (sessionState === 'loading') {
     return (
       <div className="min-h-dvh flex items-center justify-center">
-        <div className="text-lg">Checking session...</div>
+        <div className="text-lg">{t('waitingSessionCheck')}</div>
       </div>
     );
   }
@@ -204,10 +215,10 @@ export default function JoinClient() {
     return (
       <div className="min-h-dvh flex items-center justify-center p-6">
         <div className="max-w-md w-full">
-          <h1 className="text-2xl font-semibold mb-3">Session issue</h1>
-          <p className="mb-4 text-red-600">{sessionMessage ?? 'Session not found.'}</p>
+          <h1 className="text-2xl font-semibold mb-3">{t('missingSession')}</h1>
+          <p className="mb-4 text-red-600">{sessionMessage ?? t('missingSessionDescription')}</p>
           <p className="text-sm text-gray-600">
-            Make sure you scanned the QR code from the host screen. The link should look like
+            {t('missingSessionHelp')}
             <br />
             <code className="break-all">/join?session=&lt;uuid&gt;</code>
           </p>
@@ -220,8 +231,8 @@ export default function JoinClient() {
     return (
       <div className="min-h-dvh flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center">
-          <h1 className="text-2xl font-semibold mb-2">This session is closed</h1>
-          <p className="text-gray-600">Please ask the host for an active session link.</p>
+          <h1 className="text-2xl font-semibold mb-2">{t('sessionClosed')}</h1>
+          <p className="text-gray-600">{t('sessionClosedDescription')}</p>
         </div>
       </div>
     );
@@ -230,12 +241,36 @@ export default function JoinClient() {
   return (
     <main className="min-h-dvh flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-4">Coin Toss - Join</h1>
+        {!hasLangPreference && (
+          <div
+            className="mb-3 rounded-full border bg-white px-3 py-2 text-xs text-gray-700"
+            role="group"
+            aria-label={t('chooseLanguage')}
+          >
+            <span className="mr-2 font-medium">{t('languageBar')}</span>
+            {(['en', 'pl'] as const).map((code) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => {
+                  setLang(code);
+                  setHasLangPreference(true);
+                }}
+                className={`mr-2 rounded-full border px-2 py-1 ${
+                  lang === code ? 'bg-black text-white' : 'border-gray-300 text-gray-700'
+                }`}
+              >
+                {code.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        )}
+        <h1 className="text-2xl font-bold mb-4">{t('appTitleJoin')}</h1>
 
         {!submitted && (
           <div className="mb-4">
             <label className="block text-sm font-medium mb-1" htmlFor="nickname">
-              Nickname
+              {t('nickname')}
             </label>
             <input
               id="nickname"
@@ -246,7 +281,7 @@ export default function JoinClient() {
                   setFormError(null);
                 }
               }}
-              placeholder="Your nickname"
+              placeholder={t('nicknamePlaceholder')}
               className="w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-black"
               disabled={!canInteract}
             />
@@ -256,14 +291,16 @@ export default function JoinClient() {
         {!submitted && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-gray-700">Flips: {flips.length}/{FLIP_TARGET}</div>
+              <div className="text-sm text-gray-700">
+                {t('flips')}: {flips.length}/{FLIP_TARGET}
+              </div>
               <button
                 type="button"
                 onClick={resetFlips}
                 className="text-sm underline disabled:opacity-50"
                 disabled={!canInteract || flips.length === 0}
               >
-                Reset
+                {t('reset')}
               </button>
             </div>
 
@@ -272,11 +309,23 @@ export default function JoinClient() {
                 type="button"
                 onClick={flipOnce}
                 disabled={!canInteract || flips.length >= FLIP_TARGET}
-                className="w-48 h-48 rounded-full border shadow bg-white text-4xl font-bold flex items-center justify-center transition-transform duration-300 ease-out active:scale-95 disabled:opacity-50"
-                style={{ transform: isFlipping ? 'rotateX(180deg)' : 'rotateX(0deg)' }}
-                aria-label="Flip the coin"
+                className={`coin-button ${isFlipping ? 'coin-button-flip' : ''} ${
+                  !canInteract || flips.length >= FLIP_TARGET ? 'coin-button-disabled' : ''
+                }`}
+                aria-label={t('flip')}
               >
-                {flips.length === 0 ? 'Flip' : flips[flips.length - 1]}
+                <span className="sr-only">{t('flip')}</span>
+                <img
+                  src={
+                    flips.length === 0
+                      ? '/coin/heads-pl.svg'
+                      : flips[flips.length - 1] === 'H'
+                      ? '/coin/heads-pl.svg'
+                      : '/coin/tails-pl.svg'
+                  }
+                  alt=""
+                  className="coin-face"
+                />
               </button>
             </div>
 
@@ -294,7 +343,7 @@ export default function JoinClient() {
             </div>
 
             <div className="text-sm text-gray-700 mb-4">
-              Heads: <b>{heads}</b> | Tails: <b>{tails}</b>
+              {t('heads')}: <b>{heads}</b> | {t('tails')}: <b>{tails}</b>
             </div>
 
             <button
@@ -303,7 +352,7 @@ export default function JoinClient() {
               disabled={!canInteract || flips.length !== FLIP_TARGET || !nickname.trim()}
               className="w-full rounded-xl bg-black text-white py-3 font-medium disabled:opacity-50"
             >
-              {submitting ? 'Sending...' : 'Submit my 20 flips'}
+              {submitting ? t('sending') : t('submit')}
             </button>
           </div>
         )}
@@ -317,16 +366,12 @@ export default function JoinClient() {
         {submitted && (
           <div className="rounded-2xl border px-6 py-8 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-700">
-              ?
+              🎉
             </div>
-            <h2 className="text-xl font-semibold mb-2">Thank you!</h2>
-            <p className="text-gray-700 mb-2">
-              We recorded {heads} heads and {tails} tails for this session.
-            </p>
+            <h2 className="text-xl font-semibold mb-2">{t('thankYou')}</h2>
+            <p className="text-gray-700 mb-2">{t('resultRecorded', { heads, tails })}</p>
             <p className="text-sm text-gray-500">
-              {wasSubmittedLocally
-                ? 'This browser is already marked as submitted. You are all set.'
-                : 'If you need to update your result, please ask the host to reopen the form.'}
+              {wasSubmittedLocally ? t('submittedInfo') : t('submittedNeedUpdate')}
             </p>
           </div>
         )}

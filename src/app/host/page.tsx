@@ -19,6 +19,7 @@ import {
 } from 'chart.js';
 import { supabase } from '@/lib/supabaseClient';
 import { binomialPMF, binomialPValueTwoSided, headsHistogram } from '@/lib/binomial';
+import { useI18n } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,7 @@ type ResultRow = {
 type CombinedChartData = ChartData<'bar' | 'line', number[], string>;
 
 export default function HostPage() {
+  const { t, lang, setLang } = useI18n();
   const [origin, setOrigin] = useState('');
   const [session, setSession] = useState<Session | null>(null);
   const [loadingSession, setLoadingSession] = useState(false);
@@ -80,7 +82,7 @@ export default function HostPage() {
       }
 
       if (loadError) {
-        setError('Failed to load results.');
+        setError(t('couldNotLoadResults'));
         return;
       }
 
@@ -126,14 +128,14 @@ export default function HostPage() {
       supabase.removeChannel(channel);
       setRealtimeReady(false);
     };
-  }, [session?.id]);
+  }, [session?.id, t]);
 
   const joinUrl = useMemo(() => {
     if (!origin || !session?.id) {
       return '';
     }
-    return `${origin}/join?session=${session.id}`;
-  }, [origin, session?.id]);
+    return `${origin}/join?session=${session.id}&lang=${lang}`;
+  }, [lang, origin, session?.id]);
 
   const headsCounts = useMemo(() => results.map((row) => row.heads), [results]);
   const histogram = useMemo(() => headsHistogram(headsCounts, FLIP_TARGET), [headsCounts]);
@@ -235,15 +237,15 @@ export default function HostPage() {
 
     try {
       await navigator.clipboard.writeText(joinUrl);
-      setNotice('Link copied to clipboard.');
+      setNotice(t('copySuccess'));
       if (typeof window !== 'undefined') {
         window.setTimeout(() => setNotice(null), 2000);
       }
     } catch (error) {
       console.error('Failed to copy link', error);
-      setNotice('Could not copy the link. Copy it manually.');
+      setNotice(t('copyError'));
     }
-  }, [joinUrl]);
+  }, [joinUrl, t]);
 
   const handleExportCsv = useCallback(() => {
     if (!session) {
@@ -292,11 +294,11 @@ export default function HostPage() {
       setRealtimeReady(false);
     } catch (error) {
       console.error('Failed to open session', error);
-      setError('Could not open a new session.');
+      setError(t('couldNotOpen'));
     } finally {
       setLoadingSession(false);
     }
-  }, []);
+  }, [t]);
 
   const closeSession = useCallback(async () => {
     if (!session?.id) {
@@ -322,31 +324,50 @@ export default function HostPage() {
       setSession(data as Session);
     } catch (error) {
       console.error('Failed to close session', error);
-      setError('Could not close the session.');
+      setError(t('couldNotClose'));
     } finally {
       setClosing(false);
     }
-  }, [session?.id]);
+  }, [session?.id, t]);
 
   return (
     <main className="min-h-dvh p-6">
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Coin Toss - Host</h1>
+            <h1 className="text-2xl font-bold">{t('appTitleHost')}</h1>
             <div className="text-sm text-gray-600">
-              Participants: <b>{participants}</b> | Total flips: <b>{totalFlips}</b> | Total heads: <b>{totalHeads}</b> | p-value:{' '}
-              {pValue === null ? 'n/a' : <b>{pValue.toFixed(4)}</b>}
+              {t('participants')}: <b>{participants}</b> | {t('totalFlips')}: <b>{totalFlips}</b> | {t('totalHeads')}: <b>{totalHeads}</b> |{' '}
+              {t('pvalueLabel')}: {pValue === null ? 'n/a' : <b>{pValue.toFixed(4)}</b>}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <div
+              className="flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium"
+              role="group"
+              aria-label={t('chooseLanguageLabel')}
+            >
+              {(['en', 'pl'] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLang(code)}
+                  className={`rounded-full px-2 py-1 transition ${
+                    lang === code ? 'bg-black text-white' : 'text-gray-600 hover:text-black'
+                  }`}
+                  aria-pressed={lang === code}
+                >
+                  {code.toUpperCase()}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={openSession}
               disabled={loadingSession || (session?.is_open ?? false)}
               className="rounded-xl bg-black px-4 py-2 text-white disabled:opacity-50"
             >
-              {loadingSession ? 'Opening...' : 'Open session'}
+              {loadingSession ? t('sending') : t('openSession')}
             </button>
             <button
               type="button"
@@ -354,7 +375,7 @@ export default function HostPage() {
               disabled={!session?.is_open || closing}
               className="rounded-xl border px-4 py-2 disabled:opacity-50"
             >
-              {closing ? 'Closing...' : 'Close session'}
+              {closing ? t('sending') : t('closeSession')}
             </button>
             <button
               type="button"
@@ -362,7 +383,7 @@ export default function HostPage() {
               disabled={!session || results.length === 0}
               className="rounded-xl border px-4 py-2 disabled:opacity-50"
             >
-              Export CSV
+              {t('exportCsv')}
             </button>
           </div>
         </header>
@@ -381,20 +402,20 @@ export default function HostPage() {
 
         {!session && (
           <div className="rounded-2xl border px-6 py-12 text-center text-gray-700">
-            Click <b>Open session</b> to start. A QR code and join link will appear here.
+            {t('openSessionPrompt')}
           </div>
         )}
 
         {session && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <section className="rounded-2xl border p-4">
-              <h2 className="mb-3 text-lg font-semibold">Join link</h2>
+              <h2 className="mb-3 text-lg font-semibold">{t('joinLink')}</h2>
               <div className="mb-3">
-                <div className="mb-1 text-sm text-gray-600">Session ID</div>
+                <div className="mb-1 text-sm text-gray-600">{t('sessionId')}</div>
                 <code className="break-all text-sm">{session.id}</code>
               </div>
               <div className="mb-3">
-                <div className="mb-1 text-sm text-gray-600">URL</div>
+                <div className="mb-1 text-sm text-gray-600">{t('url')}</div>
                 <div className="flex items-center gap-2">
                   <code className="break-all text-sm">{joinUrl || 'n/a'}</code>
                   <button
@@ -403,7 +424,7 @@ export default function HostPage() {
                     className="rounded-lg border px-2 py-1 text-sm disabled:opacity-50"
                     disabled={!joinUrl}
                   >
-                    Copy
+                    {t('copy')}
                   </button>
                 </div>
               </div>
@@ -411,33 +432,38 @@ export default function HostPage() {
                 {joinUrl ? (
                   <QRCodeSVG value={joinUrl} size={196} includeMargin />
                 ) : (
-                  <div className="text-sm text-gray-500">QR will appear after opening a session.</div>
+                  <div className="text-sm text-gray-500">{t('qrPending')}</div>
                 )}
               </div>
               <div className="text-sm text-gray-700">
-                Status: {session.is_open ? <span className="text-green-700">OPEN</span> : <span className="text-gray-600">CLOSED</span>}
-                {realtimeReady ? (
-                  <span className="ml-2 text-xs text-gray-500">(realtime on)</span>
+                Status:{' '}
+                {session.is_open ? (
+                  <span className="text-green-700">{t('statusOpen')}</span>
                 ) : (
-                  <span className="ml-2 text-xs text-gray-400">(realtime pending)</span>
+                  <span className="text-gray-600">{t('statusClosed')}</span>
+                )}
+                {realtimeReady ? (
+                  <span className="ml-2 text-xs text-gray-500">{t('realtimeOn')}</span>
+                ) : (
+                  <span className="ml-2 text-xs text-gray-400">{t('realtimeLoading')}</span>
                 )}
               </div>
             </section>
 
             <section className="rounded-2xl border p-4 lg:col-span-2">
-              <h2 className="mb-3 text-lg font-semibold">Live histogram</h2>
+              <h2 className="mb-3 text-lg font-semibold">{t('liveHistogram')}</h2>
               <div className="h-72">
                 <Bar data={chartData as ChartData<'bar', number[], string>} options={chartOptions} />
               </div>
               <div className="mt-3 text-sm text-gray-700">
-                Two-sided exact binomial p-value (p = 0.5): {pValue === null ? 'n/a' : <b>{pValue.toFixed(4)}</b>}
+                {t('pvalueLabel')}: {pValue === null ? 'n/a' : <b>{pValue.toFixed(4)}</b>}
               </div>
             </section>
 
             <section className="rounded-2xl border p-4 lg:col-span-3">
-              <h2 className="mb-3 text-lg font-semibold">Latest submissions</h2>
+              <h2 className="mb-3 text-lg font-semibold">{t('latestSubmissions')}</h2>
               {results.length === 0 ? (
-                <div className="text-sm text-gray-600">Waiting for the first result...</div>
+                <div className="text-sm text-gray-600">{t('waitingForResults')}</div>
               ) : (
                 <ul className="divide-y">
                   {results.slice(0, 20).map((row) => (

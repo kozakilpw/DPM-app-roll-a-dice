@@ -24,3 +24,42 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.coin-button {
+  width: 12rem;
+  height: 12rem;
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  box-shadow: 0 20px 45px -20px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+  transform-style: preserve-3d;
+}
+
+.coin-button:hover:not(.coin-button-disabled) {
+  box-shadow: 0 24px 50px -18px rgba(0, 0, 0, 0.4);
+}
+
+.coin-button:active:not(.coin-button-disabled) {
+  transform: scale(0.98);
+}
+
+.coin-button-flip {
+  transform: rotateY(360deg);
+}
+
+.coin-button-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.coin-face {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  object-fit: cover;
+  pointer-events: none;
+}
