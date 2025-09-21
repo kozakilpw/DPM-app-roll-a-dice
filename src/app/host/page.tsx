@@ -1,10 +1,464 @@
-import { Suspense } from 'react';
-import JoinClient from './JoinClient';
+'use client';
 
-export default function Page() {
+import NextDynamic from 'next/dynamic';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  PointElement,
+  LineElement,
+  type ChartData,
+  type ChartDataset,
+  type ChartOptions,
+} from 'chart.js';
+import { supabase } from '@/lib/supabaseClient';
+import { binomialPMF, binomialPValueTwoSided, headsHistogram } from '@/lib/binomial';
+
+export const dynamic = 'force-dynamic';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, PointElement, LineElement);
+
+const Bar = NextDynamic(() => import('react-chartjs-2').then((mod) => mod.Bar), { ssr: false });
+
+const FLIP_TARGET = 20;
+
+type Session = { id: string; is_open: boolean; created_at: string };
+
+type ResultRow = {
+  id: string;
+  session_id: string;
+  nickname: string | null;
+  heads: number;
+  tails: number;
+  sequence: string;
+  created_at: string;
+};
+
+type CombinedChartData = ChartData<'bar' | 'line', number[], string>;
+
+export default function HostPage() {
+  const [origin, setOrigin] = useState('');
+  const [session, setSession] = useState<Session | null>(null);
+  const [loadingSession, setLoadingSession] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [results, setResults] = useState<ResultRow[]>([]);
+  const [realtimeReady, setRealtimeReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    setOrigin(window.location.origin);
+  }, []);
+
+  useEffect(() => {
+    const sessionId = session?.id;
+    if (!sessionId) {
+      setRealtimeReady(false);
+      return;
+    }
+
+    let ignore = false;
+
+    async function loadResults() {
+      const { data, error: loadError } = await supabase
+        .from('results')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false });
+
+      if (ignore) {
+        return;
+      }
+
+      if (loadError) {
+        setError('Failed to load results.');
+        return;
+      }
+
+      setResults(data ?? []);
+    }
+
+    void loadResults();
+
+    return () => {
+      ignore = true;
+    };
+  }, [session?.id]);
+
+  useEffect(() => {
+    const sessionId = session?.id;
+    if (!sessionId) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`results-session-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'results',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          const row = payload.new as ResultRow;
+          setResults((prev) => [row, ...prev]);
+          setRealtimeReady(true);
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setRealtimeReady(true);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      setRealtimeReady(false);
+    };
+  }, [session?.id]);
+
+  const joinUrl = useMemo(() => {
+    if (!origin || !session?.id) {
+      return '';
+    }
+    return `${origin}/join?session=${session.id}`;
+  }, [origin, session?.id]);
+
+  const headsCounts = useMemo(() => results.map((row) => row.heads), [results]);
+  const histogram = useMemo(() => headsHistogram(headsCounts, FLIP_TARGET), [headsCounts]);
+  const participants = results.length;
+  const totalHeads = useMemo(() => results.reduce((sum, row) => sum + row.heads, 0), [results]);
+  const totalFlips = participants * FLIP_TARGET;
+  const pValue = useMemo(() => {
+    if (totalFlips === 0) {
+      return null;
+    }
+    return binomialPValueTwoSided(totalFlips, totalHeads, 0.5);
+  }, [totalFlips, totalHeads]);
+
+  const normalizedHistogram = useMemo(() => {
+    if (participants === 0) {
+      return histogram.map(() => 0);
+    }
+    return histogram.map((value) => value / participants);
+  }, [histogram, participants]);
+
+  const expectedDistribution = useMemo(
+    () => Array.from({ length: FLIP_TARGET + 1 }, (_, k) => binomialPMF(FLIP_TARGET, k, 0.5)),
+    []
+  );
+
+  const observedDataset = useMemo<ChartDataset<'bar', number[]>>(() => ({
+    type: 'bar' as const,
+    label: 'Observed frequency',
+    data: normalizedHistogram,
+    backgroundColor: 'rgba(37, 99, 235, 0.6)',
+    borderColor: 'rgba(37, 99, 235, 0.9)',
+    borderWidth: 1,
+    borderRadius: 4,
+  }), [normalizedHistogram]);
+
+  const expectedDataset = useMemo<ChartDataset<'line', number[]>>(() => ({
+    type: 'line' as const,
+    label: 'Expected PMF (p = 0.5)',
+    data: expectedDistribution,
+    borderColor: '#f97316',
+    borderWidth: 2,
+    pointRadius: 0,
+    tension: 0.35,
+  }), [expectedDistribution]);
+
+  const chartData = useMemo<CombinedChartData>(
+    () => ({
+      labels: Array.from({ length: FLIP_TARGET + 1 }, (_, index) => index.toString()),
+      datasets: [observedDataset, expectedDataset],
+    }),
+    [observedDataset, expectedDataset]
+  );
+  const suggestedYMax = useMemo(() => {
+    const allValues = [...normalizedHistogram, ...expectedDistribution];
+    const max = allValues.reduce((current, value) => (value > current ? value : current), 0);
+    return max === 0 ? 0.1 : Math.min(1, max * 1.2);
+  }, [normalizedHistogram, expectedDistribution]);
+
+  const chartOptions = useMemo<ChartOptions<'bar'>>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true },
+        title: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const value = typeof context.parsed.y === 'number' ? context.parsed.y : 0;
+              const datasetType = (context.dataset as { type?: string }).type;
+              const labelPrefix = datasetType === 'line' ? 'Expected' : 'Observed';
+              return `${labelPrefix}: ${(value * 100).toFixed(1)}%`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Heads (out of 20)' },
+        },
+        y: {
+          title: { display: true, text: 'Probability' },
+          suggestedMin: 0,
+          suggestedMax: suggestedYMax,
+          ticks: {
+            callback: (value) => `${Number(value) * 100}%`,
+          },
+        },
+      },
+    }),
+    [suggestedYMax]
+  );
+
+  const handleCopyLink = useCallback(async () => {
+    if (!joinUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(joinUrl);
+      setNotice('Link copied to clipboard.');
+      if (typeof window !== 'undefined') {
+        window.setTimeout(() => setNotice(null), 2000);
+      }
+    } catch (error) {
+      console.error('Failed to copy link', error);
+      setNotice('Could not copy the link. Copy it manually.');
+    }
+  }, [joinUrl]);
+
+  const handleExportCsv = useCallback(() => {
+    if (!session) {
+      return;
+    }
+
+    const rows = results.map((row) => [
+      row.id,
+      row.nickname ?? '',
+      row.heads.toString(),
+      row.tails.toString(),
+      row.sequence,
+      row.created_at,
+    ]);
+
+    const csv = ['id,nickname,heads,tails,sequence,created_at', ...rows.map((row) => row.map((value) => `"${value.replace(/"/g, '""')}"`).join(','))].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `coin-toss-${session.id}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [results, session]);
+
+  const openSession = useCallback(async () => {
+    setError(null);
+    setNotice(null);
+    setLoadingSession(true);
+    try {
+      const { data, error: insertError } = await supabase
+        .from('sessions')
+        .insert({})
+        .select('id, created_at, is_open')
+        .single();
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      setSession(data as Session);
+      setResults([]);
+      setRealtimeReady(false);
+    } catch (error) {
+      console.error('Failed to open session', error);
+      setError('Could not open a new session.');
+    } finally {
+      setLoadingSession(false);
+    }
+  }, []);
+
+  const closeSession = useCallback(async () => {
+    if (!session?.id) {
+      return;
+    }
+
+    setClosing(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const { data, error: updateError } = await supabase
+        .from('sessions')
+        .update({ is_open: false })
+        .eq('id', session.id)
+        .select('id, created_at, is_open')
+        .single();
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setSession(data as Session);
+    } catch (error) {
+      console.error('Failed to close session', error);
+      setError('Could not close the session.');
+    } finally {
+      setClosing(false);
+    }
+  }, [session?.id]);
+
   return (
-    <Suspense fallback={<div className="min-h-dvh flex items-center justify-center">Loading…</div>}>
-      <JoinClient />
-    </Suspense>
+    <main className="min-h-dvh p-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Coin Toss - Host</h1>
+            <div className="text-sm text-gray-600">
+              Participants: <b>{participants}</b> | Total flips: <b>{totalFlips}</b> | Total heads: <b>{totalHeads}</b> | p-value:{' '}
+              {pValue === null ? 'n/a' : <b>{pValue.toFixed(4)}</b>}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={openSession}
+              disabled={loadingSession || (session?.is_open ?? false)}
+              className="rounded-xl bg-black px-4 py-2 text-white disabled:opacity-50"
+            >
+              {loadingSession ? 'Opening...' : 'Open session'}
+            </button>
+            <button
+              type="button"
+              onClick={closeSession}
+              disabled={!session?.is_open || closing}
+              className="rounded-xl border px-4 py-2 disabled:opacity-50"
+            >
+              {closing ? 'Closing...' : 'Close session'}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={!session || results.length === 0}
+              className="rounded-xl border px-4 py-2 disabled:opacity-50"
+            >
+              Export CSV
+            </button>
+          </div>
+        </header>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {notice && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+            {notice}
+          </div>
+        )}
+
+        {!session && (
+          <div className="rounded-2xl border px-6 py-12 text-center text-gray-700">
+            Click <b>Open session</b> to start. A QR code and join link will appear here.
+          </div>
+        )}
+
+        {session && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <section className="rounded-2xl border p-4">
+              <h2 className="mb-3 text-lg font-semibold">Join link</h2>
+              <div className="mb-3">
+                <div className="mb-1 text-sm text-gray-600">Session ID</div>
+                <code className="break-all text-sm">{session.id}</code>
+              </div>
+              <div className="mb-3">
+                <div className="mb-1 text-sm text-gray-600">URL</div>
+                <div className="flex items-center gap-2">
+                  <code className="break-all text-sm">{joinUrl || 'n/a'}</code>
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="rounded-lg border px-2 py-1 text-sm disabled:opacity-50"
+                    disabled={!joinUrl}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div className="mb-4 flex items-center justify-center">
+                {joinUrl ? (
+                  <QRCodeSVG value={joinUrl} size={196} includeMargin />
+                ) : (
+                  <div className="text-sm text-gray-500">QR will appear after opening a session.</div>
+                )}
+              </div>
+              <div className="text-sm text-gray-700">
+                Status: {session.is_open ? <span className="text-green-700">OPEN</span> : <span className="text-gray-600">CLOSED</span>}
+                {realtimeReady ? (
+                  <span className="ml-2 text-xs text-gray-500">(realtime on)</span>
+                ) : (
+                  <span className="ml-2 text-xs text-gray-400">(realtime pending)</span>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border p-4 lg:col-span-2">
+              <h2 className="mb-3 text-lg font-semibold">Live histogram</h2>
+              <div className="h-72">
+                <Bar data={chartData as ChartData<'bar', number[], string>} options={chartOptions} />
+              </div>
+              <div className="mt-3 text-sm text-gray-700">
+                Two-sided exact binomial p-value (p = 0.5): {pValue === null ? 'n/a' : <b>{pValue.toFixed(4)}</b>}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border p-4 lg:col-span-3">
+              <h2 className="mb-3 text-lg font-semibold">Latest submissions</h2>
+              {results.length === 0 ? (
+                <div className="text-sm text-gray-600">Waiting for the first result...</div>
+              ) : (
+                <ul className="divide-y">
+                  {results.slice(0, 20).map((row) => (
+                    <li key={row.id} className="flex items-center justify-between py-2">
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-800">
+                          {row.nickname || 'n/a'}
+                        </span>
+                        <span className="text-sm text-gray-700">
+                          {row.heads}H / {row.tails}T
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-500">{new Date(row.created_at).toLocaleTimeString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
