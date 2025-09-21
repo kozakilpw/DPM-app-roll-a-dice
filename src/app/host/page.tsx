@@ -12,6 +12,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  type ChartOptions,
 } from 'chart.js';
 import { binomialPValueTwoSided, headsHistogram } from '@/lib/binomial';
 
@@ -165,7 +166,7 @@ export default function HostPage() {
     [hist]
   );
 
-  const chartOptions = useMemo(
+  const chartOptions = useMemo<ChartOptions<'bar'>>(
     () => ({
       responsive: true,
       plugins: {
@@ -278,7 +279,7 @@ export default function HostPage() {
                 Participants: <b>{participants}</b> &nbsp;|&nbsp; Total flips:{' '}
                 <b>{totalFlips}</b> &nbsp;|&nbsp; Total heads: <b>{totalHeads}</b>
               </div>
-              <Bar data={chartData} options={chartOptions as any} />
+              <Bar data={chartData} options={chartOptions} />
               <div className="mt-3 text-sm">
                 Two-sided exact binomial p-value (vs fair coin, p=0.5):{' '}
                 {pValue === null ? '—' : <b>{pValue.toFixed(4)}</b>}
