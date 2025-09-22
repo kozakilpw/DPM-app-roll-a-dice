@@ -5,7 +5,8 @@ Next.js 15 (App Router) app for running a classroom coin toss experiment backed 
 ## Local Development
 
 1. Install dependencies: `npm install`
-2. Copy environment variables: `cp .env.example .env.local` and fill in `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+2. Copy environment variables: `cp .env.example .env.local` and fill in `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+   `NEXT_PUBLIC_COIN_HEADS_URL`, and `NEXT_PUBLIC_COIN_TAILS_URL`
 3. Apply SQL in `supabase/sql/schema.sql` and `supabase/sql/policies.sql` to your Supabase project (via the SQL editor)
 4. Start the dev server: `npm run dev`
 
@@ -28,6 +29,8 @@ Linting, type checking, and build commands:
 2. In **Project -> Settings -> Environment Variables**, add:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_COIN_HEADS_URL`
+   - `NEXT_PUBLIC_COIN_TAILS_URL`
 3. Trigger a redeploy; Vercel will run `npm run build:ci`
 4. The `/host` page uses live Realtime subscriptions, so keep the project on a hobby/pro plan that allows them
 
@@ -41,4 +44,6 @@ Linting, type checking, and build commands:
 ## Feature Notes
 
 - `/host` shows a normalized histogram with the expected Binomial(20, 0.5) overlay, CSV export, real-time updates, and an EN/PL toggle that also adds `?lang=pl` to the QR code link.
-- `/join` blocks duplicate submissions per browser (localStorage), greets first-time visitors with an English/Polish chooser, and uses a flipping coin button rendered from `/public/coin/heads-pl.svg` + `/public/coin/tails-pl.svg`.
+- `/join` blocks duplicate submissions per browser (localStorage), greets first-time visitors with an English/Polish chooser, and
+  renders the flipping coin from URLs provided in `NEXT_PUBLIC_COIN_HEADS_URL` / `NEXT_PUBLIC_COIN_TAILS_URL` with circular
+  clipping and a rim for dark-mode support.

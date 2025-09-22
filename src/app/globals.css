@@ -3,6 +3,13 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --coin-button-bg: #ffffff;
+  --coin-button-border: #d1d5db;
+  --coin-face-bg: #f8fafc;
+  --coin-face-highlight: rgba(255, 255, 255, 0.9);
+  --coin-face-rim: rgba(15, 23, 42, 0.12);
+  --font-geist-sans: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-geist-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
 }
 
 @theme inline {
@@ -16,21 +23,28 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --coin-button-bg: #111827;
+    --coin-button-border: rgba(148, 163, 184, 0.35);
+    --coin-face-bg: #1f2937;
+    --coin-face-highlight: rgba(255, 255, 255, 0.08);
+    --coin-face-rim: rgba(148, 163, 184, 0.35);
+    --font-geist-sans: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-geist-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans);
 }
 
 .coin-button {
   width: 12rem;
   height: 12rem;
   border-radius: 9999px;
-  border: 1px solid #d1d5db;
-  background-color: #ffffff;
+  border: 1px solid var(--coin-button-border);
+  background-color: var(--coin-button-bg);
   box-shadow: 0 20px 45px -20px rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
@@ -57,9 +71,27 @@ body {
 }
 
 .coin-face {
-  width: 100%;
-  height: 100%;
+  width: 10rem;
+  height: 10rem;
   border-radius: 9999px;
-  object-fit: cover;
+  clip-path: circle(49% at 50% 50%);
+  overflow: hidden;
+  background-color: var(--coin-face-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow:
+    inset 0 0 0 3px var(--coin-face-highlight),
+    inset 0 0 0 8px var(--coin-face-rim);
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coin-face-letter {
+  font-size: 3rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--foreground);
 }

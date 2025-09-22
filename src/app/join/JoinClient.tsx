@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { useI18n } from '@/lib/i18n';
+import { useI18n, type Lang } from '@/lib/i18n';
 
 type Flip = 'H' | 'T';
 
@@ -11,7 +11,20 @@ type SessionState = 'loading' | 'ready' | 'closed' | 'missing';
 
 const FLIP_TARGET = 20;
 
+const HEADS_IMAGE_URL = process.env.NEXT_PUBLIC_COIN_HEADS_URL;
+const TAILS_IMAGE_URL = process.env.NEXT_PUBLIC_COIN_TAILS_URL;
+
 const storageKey = (sessionId: string) => `tossed:${sessionId}`;
+
+const formatFlipSymbol = (flip: Flip | undefined, lang: Lang) => {
+  if (!flip) {
+    return '';
+  }
+  if (lang === 'pl') {
+    return flip === 'H' ? 'O' : 'R';
+  }
+  return flip;
+};
 
 export default function JoinClient() {
   const search = useSearchParams();
@@ -129,6 +142,13 @@ export default function JoinClient() {
 
   const canInteract = sessionState === 'ready' && !submitted && !submitting;
 
+  const activeFace: Flip = flips.length === 0 ? 'H' : flips[flips.length - 1];
+  const activeCoinImageUrl =
+    activeFace === 'H' ? HEADS_IMAGE_URL ?? null : TAILS_IMAGE_URL ?? null;
+  const activeCoinHasImage = activeFace === 'H' ? Boolean(HEADS_IMAGE_URL) : Boolean(TAILS_IMAGE_URL);
+  const activeCoinSymbol = formatFlipSymbol(activeFace, lang);
+  const coinAriaLabel = t(activeFace === 'H' ? 'heads' : 'tails');
+
   const flipOnce = useCallback(() => {
     if (!canInteract) return;
 
@@ -217,7 +237,7 @@ export default function JoinClient() {
         <div className="max-w-md w-full">
           <h1 className="text-2xl font-semibold mb-3">{t('missingSession')}</h1>
           <p className="mb-4 text-red-600">{sessionMessage ?? t('missingSessionDescription')}</p>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             {t('missingSessionHelp')}
             <br />
             <code className="break-all">/join?session=&lt;uuid&gt;</code>
@@ -232,7 +252,7 @@ export default function JoinClient() {
       <div className="min-h-dvh flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center">
           <h1 className="text-2xl font-semibold mb-2">{t('sessionClosed')}</h1>
-          <p className="text-gray-600">{t('sessionClosedDescription')}</p>
+          <p className="text-gray-600 dark:text-gray-300">{t('sessionClosedDescription')}</p>
         </div>
       </div>
     );
@@ -243,7 +263,7 @@ export default function JoinClient() {
       <div className="w-full max-w-md">
         {!hasLangPreference && (
           <div
-            className="mb-3 rounded-full border bg-white px-3 py-2 text-xs text-gray-700"
+            className="mb-3 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
             role="group"
             aria-label={t('chooseLanguage')}
           >
@@ -256,8 +276,10 @@ export default function JoinClient() {
                   setLang(code);
                   setHasLangPreference(true);
                 }}
-                className={`mr-2 rounded-full border px-2 py-1 ${
-                  lang === code ? 'bg-black text-white' : 'border-gray-300 text-gray-700'
+                className={`mr-2 rounded-full border px-2 py-1 transition-colors ${
+                  lang === code
+                    ? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800'
                 }`}
               >
                 {code.toUpperCase()}
@@ -291,13 +313,13 @@ export default function JoinClient() {
         {!submitted && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-gray-700">
+              <div className="text-sm text-gray-700 dark:text-gray-200">
                 {t('flips')}: {flips.length}/{FLIP_TARGET}
               </div>
               <button
                 type="button"
                 onClick={resetFlips}
-                className="text-sm underline disabled:opacity-50"
+                className="text-sm underline disabled:opacity-50 dark:text-slate-200"
                 disabled={!canInteract || flips.length === 0}
               >
                 {t('reset')}
@@ -315,17 +337,18 @@ export default function JoinClient() {
                 aria-label={t('flip')}
               >
                 <span className="sr-only">{t('flip')}</span>
-                <img
-                  src={
-                    flips.length === 0
-                      ? '/coin/heads-pl.svg'
-                      : flips[flips.length - 1] === 'H'
-                      ? '/coin/heads-pl.svg'
-                      : '/coin/tails-pl.svg'
-                  }
-                  alt=""
+                <div
                   className="coin-face"
-                />
+                  aria-label={coinAriaLabel}
+                  role="img"
+                  style={activeCoinImageUrl ? { backgroundImage: `url(${activeCoinImageUrl})` } : undefined}
+                >
+                  {activeCoinHasImage ? null : (
+                    <span className="coin-face-letter" aria-hidden="true">
+                      {activeCoinSymbol}
+                    </span>
+                  )}
+                </div>
               </button>
             </div>
 
@@ -333,16 +356,18 @@ export default function JoinClient() {
               {Array.from({ length: FLIP_TARGET }).map((_, index) => (
                 <div
                   key={index}
-                  className={`h-8 rounded-md flex items-center justify-center text-sm border ${
-                    flips[index] ? 'bg-gray-100 font-medium' : 'bg-white'
+                  className={`h-8 rounded-md flex items-center justify-center text-sm border border-gray-200 dark:border-slate-700 ${
+                    flips[index]
+                      ? 'bg-gray-100 font-medium text-gray-900 dark:bg-slate-700 dark:text-slate-100'
+                      : 'bg-white dark:bg-slate-800'
                   }`}
                 >
-                  {flips[index] ?? ''}
+                  {formatFlipSymbol(flips[index], lang)}
                 </div>
               ))}
             </div>
 
-            <div className="text-sm text-gray-700 mb-4">
+            <div className="text-sm text-gray-700 dark:text-gray-200 mb-4">
               {t('heads')}: <b>{heads}</b> | {t('tails')}: <b>{tails}</b>
             </div>
 
@@ -350,7 +375,7 @@ export default function JoinClient() {
               type="button"
               onClick={submitResult}
               disabled={!canInteract || flips.length !== FLIP_TARGET || !nickname.trim()}
-              className="w-full rounded-xl bg-black text-white py-3 font-medium disabled:opacity-50"
+              className="w-full rounded-xl bg-black text-white py-3 font-medium transition-colors disabled:opacity-50 dark:bg-white dark:text-black"
             >
               {submitting ? t('sending') : t('submit')}
             </button>
@@ -358,19 +383,19 @@ export default function JoinClient() {
         )}
 
         {formError && !submitted && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
             {formError}
           </div>
         )}
 
         {submitted && (
-          <div className="rounded-2xl border px-6 py-8 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-700">
+          <div className="rounded-2xl border border-gray-200 px-6 py-8 text-center dark:border-slate-700 dark:bg-slate-900/60">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-700 dark:bg-emerald-500/20 dark:text-emerald-200">
               🎉
             </div>
             <h2 className="text-xl font-semibold mb-2">{t('thankYou')}</h2>
-            <p className="text-gray-700 mb-2">{t('resultRecorded', { heads, tails })}</p>
-            <p className="text-sm text-gray-500">
+            <p className="text-gray-700 dark:text-gray-200 mb-2">{t('resultRecorded', { heads, tails })}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {wasSubmittedLocally ? t('submittedInfo') : t('submittedNeedUpdate')}
             </p>
           </div>
