@@ -17,6 +17,13 @@ type TranslationKey =
   | 'appTitleJoin'
   | 'openSession'
   | 'closeSession'
+  | 'sessionsPanel'
+  | 'resume'
+  | 'close'
+  | 'confirmClose'
+  | 'lastSession'
+  | 'copyId'
+  | 'noSessionsYet'
   | 'exportCsv'
   | 'joinLink'
   | 'url'
@@ -37,6 +44,7 @@ type TranslationKey =
   | 'copy'
   | 'copySuccess'
   | 'copyError'
+  | 'coinCaption'
   | 'qrPending'
   | 'nickname'
   | 'nicknamePlaceholder'
@@ -65,7 +73,9 @@ type TranslationKey =
   | 'openSessionPrompt'
   | 'chooseLanguage'
   | 'languageBar'
-  | 'chooseLanguageLabel';
+  | 'chooseLanguageLabel'
+  | 'headsSymbol'
+  | 'tailsSymbol';
 
 type Dictionary = Record<TranslationKey, string>;
 
@@ -75,6 +85,13 @@ const dictionaries: Record<Lang, Dictionary> = {
     appTitleJoin: 'Coin Toss · Join',
     openSession: 'Open session',
     closeSession: 'Close session',
+    sessionsPanel: 'Sessions',
+    resume: 'Resume',
+    close: 'Close',
+    confirmClose: 'Are you sure you want to close this session?',
+    lastSession: 'Current session',
+    copyId: 'Copy ID',
+    noSessionsYet: 'No sessions yet.',
     exportCsv: 'Export CSV',
     joinLink: 'Join link',
     url: 'URL',
@@ -95,6 +112,7 @@ const dictionaries: Record<Lang, Dictionary> = {
     copy: 'Copy',
     copySuccess: 'Link copied to clipboard.',
     copyError: 'Could not copy the link. Copy it manually.',
+    coinCaption: 'Heads / Tails',
     qrPending: 'QR will appear after opening a session.',
     nickname: 'Nickname',
     nicknamePlaceholder: 'Your nickname',
@@ -124,12 +142,21 @@ const dictionaries: Record<Lang, Dictionary> = {
     chooseLanguage: 'Choose language',
     languageBar: 'Choose language / Wybierz język:',
     chooseLanguageLabel: 'Language',
+    headsSymbol: 'Hd',
+    tailsSymbol: 'Tl',
   },
   pl: {
     appTitleHost: 'Rzut monetą · Prowadzący',
     appTitleJoin: 'Rzut monetą · Dołącz',
     openSession: 'Otwórz sesję',
     closeSession: 'Zamknij sesję',
+    sessionsPanel: 'Sesje',
+    resume: 'Wznów',
+    close: 'Zamknij',
+    confirmClose: 'Czy na pewno chcesz zamknąć tę sesję?',
+    lastSession: 'Aktywna sesja',
+    copyId: 'Kopiuj ID',
+    noSessionsYet: 'Brak sesji.',
     exportCsv: 'Eksportuj CSV',
     joinLink: 'Link dołączenia',
     url: 'Adres URL',
@@ -150,6 +177,7 @@ const dictionaries: Record<Lang, Dictionary> = {
     copy: 'Kopiuj',
     copySuccess: 'Skopiowano link do schowka.',
     copyError: 'Nie udało się skopiować linku. Skopiuj go ręcznie.',
+    coinCaption: 'Orzeł / Reszka',
     qrPending: 'QR pojawi się po otwarciu sesji.',
     nickname: 'Pseudonim',
     nicknamePlaceholder: 'Twój pseudonim',
@@ -179,6 +207,8 @@ const dictionaries: Record<Lang, Dictionary> = {
     chooseLanguage: 'Wybierz język',
     languageBar: 'Choose language / Wybierz język:',
     chooseLanguageLabel: 'Język',
+    headsSymbol: 'O',
+    tailsSymbol: 'R',
   },
 };
 

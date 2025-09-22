@@ -43,7 +43,20 @@ Linting, type checking, and build commands:
 
 ## Feature Notes
 
-- `/host` shows a normalized histogram with the expected Binomial(20, 0.5) overlay, CSV export, real-time updates, and an EN/PL toggle that also adds `?lang=pl` to the QR code link.
-- `/join` blocks duplicate submissions per browser (localStorage), greets first-time visitors with an English/Polish chooser, and
-  renders the flipping coin from URLs provided in `NEXT_PUBLIC_COIN_HEADS_URL` / `NEXT_PUBLIC_COIN_TAILS_URL` with circular
-  clipping and a rim for dark-mode support.
+- `/host` now includes a Sessions panel that lists the latest 20 sessions, allows resuming or closing any entry, and keeps the current session id in the URL (`/host?session=<uuid>`) as well as `localStorage` for automatic restores after refreshes. The histogram, realtime feed, and CSV export stay bound to the active session.
+- `/join` blocks duplicate submissions per browser (localStorage), greets first-time visitors with an English/Polish chooser, and renders a circular coin button that flips on tap using the artwork provided via the `NEXT_PUBLIC_COIN_HEADS_URL` / `NEXT_PUBLIC_COIN_TAILS_URL` environment variables (with inline SVG fallbacks).
+
+## Managing sessions on /host
+
+- Use the **Sessions** panel to resume any recent session or close one without leaving the dashboard. Closing is confirmed before persisting the change in Supabase.
+- Opening or resuming a session updates `localStorage['lastSessionId']` and deep-links the page to `/host?session=<uuid>` so that refreshes (or sharing the link) restore the same context.
+- The current session badge under the header exposes a quick copy button for the session id; realtime subscriptions automatically rebind when the session changes.
+
+## Localization defaults
+
+- The interface defaults to Polish (`pl`). Switch to English either with the header toggle or by appending `?lang=en` to `/host` or `/join`. Once chosen, the preference is stored in `localStorage` and reused.
+
+## Coin artwork & hosting tips
+
+- Provide high-resolution heads/tails images via `NEXT_PUBLIC_COIN_HEADS_URL` and `NEXT_PUBLIC_COIN_TAILS_URL`. If the variables are missing, the UI renders lightweight inline SVG coins instead.
+- Supabase Storage public buckets work well for hosting the coin art—upload both sides, copy their public URLs, and set the variables locally (`.env.local`) and in Vercel (Project → Settings → Environment Variables).
