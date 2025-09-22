@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { useI18n, type Lang } from '@/lib/i18n';
+import { useI18n } from '@/lib/i18n';
 
 type Flip = 'H' | 'T';
 
@@ -16,14 +16,28 @@ const TAILS_IMAGE_URL = process.env.NEXT_PUBLIC_COIN_TAILS_URL;
 
 const storageKey = (sessionId: string) => `tossed:${sessionId}`;
 
-const formatFlipSymbol = (flip: Flip | undefined, lang: Lang) => {
+const createCoinSvg = (label: string, gradientStart: string, gradientEnd: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+      <defs>
+        <radialGradient id="g" cx="50%" cy="50%" r="75%">
+          <stop offset="0%" stop-color="${gradientStart}" />
+          <stop offset="100%" stop-color="${gradientEnd}" />
+        </radialGradient>
+      </defs>
+      <circle cx="128" cy="128" r="120" fill="url(#g)" stroke="rgba(255,255,255,0.65)" stroke-width="4" />
+      <circle cx="128" cy="128" r="108" fill="none" stroke="rgba(15,23,42,0.28)" stroke-width="10" />
+      <text x="50%" y="52%" dominant-baseline="middle" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="38" font-weight="600" fill="rgba(255,255,255,0.92)" stroke="rgba(15,23,42,0.4)" stroke-width="1.5">
+        ${label}
+      </text>
+    </svg>`
+  )}`;
+
+const formatFlipSymbol = (flip: Flip | undefined, headsSymbol: string, tailsSymbol: string) => {
   if (!flip) {
     return '';
   }
-  if (lang === 'pl') {
-    return flip === 'H' ? 'O' : 'R';
-  }
-  return flip;
+  return flip === 'H' ? headsSymbol : tailsSymbol;
 };
 
 export default function JoinClient() {
@@ -142,11 +156,24 @@ export default function JoinClient() {
 
   const canInteract = sessionState === 'ready' && !submitted && !submitting;
 
+  const fallbackHeadsSvg = useMemo(
+    () => createCoinSvg(lang === 'pl' ? 'Orzeł' : 'Heads', '#facc15', '#b45309'),
+    [lang],
+  );
+  const fallbackTailsSvg = useMemo(
+    () => createCoinSvg(lang === 'pl' ? 'Reszka' : 'Tails', '#e5e7eb', '#4b5563'),
+    [lang],
+  );
+
+  const headsSymbolShort = t('headsSymbol');
+  const tailsSymbolShort = t('tailsSymbol');
+  const coinCaption = t('coinCaption');
+
   const activeFace: Flip = flips.length === 0 ? 'H' : flips[flips.length - 1];
-  const activeCoinImageUrl =
-    activeFace === 'H' ? HEADS_IMAGE_URL ?? null : TAILS_IMAGE_URL ?? null;
-  const activeCoinHasImage = activeFace === 'H' ? Boolean(HEADS_IMAGE_URL) : Boolean(TAILS_IMAGE_URL);
-  const activeCoinSymbol = formatFlipSymbol(activeFace, lang);
+  const activeCoinImageSrc =
+    activeFace === 'H'
+      ? HEADS_IMAGE_URL ?? fallbackHeadsSvg
+      : TAILS_IMAGE_URL ?? fallbackTailsSvg;
   const coinAriaLabel = t(activeFace === 'H' ? 'heads' : 'tails');
 
   const flipOnce = useCallback(() => {
@@ -225,7 +252,7 @@ export default function JoinClient() {
 
   if (sessionState === 'loading') {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center bg-white text-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
         <div className="text-lg">{t('waitingSessionCheck')}</div>
       </div>
     );
@@ -233,11 +260,11 @@ export default function JoinClient() {
 
   if (sessionState === 'missing') {
     return (
-      <div className="min-h-dvh flex items-center justify-center p-6">
-        <div className="max-w-md w-full">
-          <h1 className="text-2xl font-semibold mb-3">{t('missingSession')}</h1>
-          <p className="mb-4 text-red-600">{sessionMessage ?? t('missingSessionDescription')}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
+      <div className="min-h-dvh flex items-center justify-center bg-white p-6 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+        <div className="w-full max-w-md">
+          <h1 className="mb-3 text-2xl font-semibold">{t('missingSession')}</h1>
+          <p className="mb-4 text-red-600 dark:text-red-400">{sessionMessage ?? t('missingSessionDescription')}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-300">
             {t('missingSessionHelp')}
             <br />
             <code className="break-all">/join?session=&lt;uuid&gt;</code>
@@ -249,21 +276,21 @@ export default function JoinClient() {
 
   if (sessionState === 'closed') {
     return (
-      <div className="min-h-dvh flex items-center justify-center p-6">
-        <div className="max-w-md w-full text-center">
-          <h1 className="text-2xl font-semibold mb-2">{t('sessionClosed')}</h1>
-          <p className="text-gray-600 dark:text-gray-300">{t('sessionClosedDescription')}</p>
+      <div className="min-h-dvh flex items-center justify-center bg-white p-6 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+        <div className="w-full max-w-md text-center">
+          <h1 className="mb-2 text-2xl font-semibold">{t('sessionClosed')}</h1>
+          <p className="text-zinc-600 dark:text-zinc-300">{t('sessionClosedDescription')}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <main className="min-h-dvh flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
+    <main className="min-h-dvh flex items-center justify-center bg-white p-6 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
         {!hasLangPreference && (
           <div
-            className="mb-3 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+            className="mb-3 rounded-full border border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200"
             role="group"
             aria-label={t('chooseLanguage')}
           >
@@ -278,8 +305,8 @@ export default function JoinClient() {
                 }}
                 className={`mr-2 rounded-full border px-2 py-1 transition-colors ${
                   lang === code
-                    ? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800'
+                    ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
+                    : 'border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-700/60'
                 }`}
               >
                 {code.toUpperCase()}
@@ -287,7 +314,7 @@ export default function JoinClient() {
             ))}
           </div>
         )}
-        <h1 className="text-2xl font-bold mb-4">{t('appTitleJoin')}</h1>
+        <h1 className="mb-4 text-2xl font-bold">{t('appTitleJoin')}</h1>
 
         {!submitted && (
           <div className="mb-4">
@@ -304,7 +331,7 @@ export default function JoinClient() {
                 }
               }}
               placeholder={t('nicknamePlaceholder')}
-              className="w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-black"
+              className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none transition focus:ring-2 focus:ring-zinc-900 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:ring-zinc-200"
               disabled={!canInteract}
             />
           </div>
@@ -313,13 +340,13 @@ export default function JoinClient() {
         {!submitted && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-gray-700 dark:text-gray-200">
+              <div className="text-sm text-zinc-700 dark:text-zinc-200">
                 {t('flips')}: {flips.length}/{FLIP_TARGET}
               </div>
               <button
                 type="button"
                 onClick={resetFlips}
-                className="text-sm underline disabled:opacity-50 dark:text-slate-200"
+                className="text-sm text-zinc-600 underline transition hover:text-zinc-900 disabled:opacity-50 dark:text-zinc-300 dark:hover:text-zinc-100"
                 disabled={!canInteract || flips.length === 0}
               >
                 {t('reset')}
@@ -337,37 +364,30 @@ export default function JoinClient() {
                 aria-label={t('flip')}
               >
                 <span className="sr-only">{t('flip')}</span>
-                <div
-                  className="coin-face"
-                  aria-label={coinAriaLabel}
-                  role="img"
-                  style={activeCoinImageUrl ? { backgroundImage: `url(${activeCoinImageUrl})` } : undefined}
-                >
-                  {activeCoinHasImage ? null : (
-                    <span className="coin-face-letter" aria-hidden="true">
-                      {activeCoinSymbol}
-                    </span>
-                  )}
+                <div className="coin-face" aria-label={coinAriaLabel} role="img">
+                  <img src={activeCoinImageSrc} alt="" className="coin-face-image" />
                 </div>
               </button>
             </div>
+
+            <div className="mb-3 text-center text-sm text-zinc-600 dark:text-zinc-300">{coinCaption}</div>
 
             <div className="grid grid-cols-10 gap-1 mb-2">
               {Array.from({ length: FLIP_TARGET }).map((_, index) => (
                 <div
                   key={index}
-                  className={`h-8 rounded-md flex items-center justify-center text-sm border border-gray-200 dark:border-slate-700 ${
+                  className={`flex h-8 items-center justify-center rounded-md border border-zinc-300 text-[11px] font-medium text-zinc-700 dark:border-zinc-600 dark:text-zinc-100 ${
                     flips[index]
-                      ? 'bg-gray-100 font-medium text-gray-900 dark:bg-slate-700 dark:text-slate-100'
-                      : 'bg-white dark:bg-slate-800'
+                      ? 'bg-zinc-100 dark:bg-zinc-700'
+                      : 'bg-white dark:bg-zinc-800'
                   }`}
                 >
-                  {formatFlipSymbol(flips[index], lang)}
+                  {formatFlipSymbol(flips[index], headsSymbolShort, tailsSymbolShort)}
                 </div>
               ))}
             </div>
 
-            <div className="text-sm text-gray-700 dark:text-gray-200 mb-4">
+            <div className="mb-4 text-sm text-zinc-700 dark:text-zinc-200">
               {t('heads')}: <b>{heads}</b> | {t('tails')}: <b>{tails}</b>
             </div>
 
@@ -375,7 +395,7 @@ export default function JoinClient() {
               type="button"
               onClick={submitResult}
               disabled={!canInteract || flips.length !== FLIP_TARGET || !nickname.trim()}
-              className="w-full rounded-xl bg-black text-white py-3 font-medium transition-colors disabled:opacity-50 dark:bg-white dark:text-black"
+              className="w-full rounded-xl bg-zinc-900 py-3 font-medium text-white transition hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white/80"
             >
               {submitting ? t('sending') : t('submit')}
             </button>
@@ -389,13 +409,13 @@ export default function JoinClient() {
         )}
 
         {submitted && (
-          <div className="rounded-2xl border border-gray-200 px-6 py-8 text-center dark:border-slate-700 dark:bg-slate-900/60">
+          <div className="rounded-2xl border border-zinc-300 px-6 py-8 text-center dark:border-zinc-600 dark:bg-zinc-900/60">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-700 dark:bg-emerald-500/20 dark:text-emerald-200">
               🎉
             </div>
             <h2 className="text-xl font-semibold mb-2">{t('thankYou')}</h2>
-            <p className="text-gray-700 dark:text-gray-200 mb-2">{t('resultRecorded', { heads, tails })}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="mb-2 text-zinc-700 dark:text-zinc-200">{t('resultRecorded', { heads, tails })}</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {wasSubmittedLocally ? t('submittedInfo') : t('submittedNeedUpdate')}
             </p>
           </div>
