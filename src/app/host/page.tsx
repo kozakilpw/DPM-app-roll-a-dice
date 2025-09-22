@@ -94,7 +94,7 @@ export default function HostPage() {
     return () => {
       ignore = true;
     };
-  }, [session?.id]);
+  }, [session?.id, t]);
 
   useEffect(() => {
     const sessionId = session?.id;
